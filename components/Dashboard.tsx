@@ -40,16 +40,22 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const token = localStorage.getItem('token');
-    if (!token) { router.push('/'); return; }
 
     const verified = searchParams.get('verified');
     const registered = searchParams.get('registered');
     const err = searchParams.get('error');
 
+    // Store the fresh JWT from the verification redirect before the auth guard,
+    // so the link works from any browser/device where the user isn't already logged in.
     if (verified === 'true') {
       const freshToken = searchParams.get('token');
       if (freshToken) setToken(freshToken);
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) { router.push('/'); return; }
+
+    if (verified === 'true') {
       setBanner({ msg: t.verifiedBanner, type: 'success' });
       window.history.replaceState({}, '', '/dashboard');
       setTimeout(() => setBanner(null), 6000);
