@@ -1,6 +1,6 @@
-import type { AuthResult, Batch, DiscoveryCandidate, EmailTemplate, PaginatedCompanies, PersonaSearchResult, TenantProfile, UploadResult } from './types';
+import type { AdminUser, AuthResult, Batch, DiscoveryCandidate, EmailTemplate, PaginatedAuditLog, PaginatedCompanies, PersonaSearchResult, TenantProfile, UploadResult } from './types';
 
-const API_BASE = '/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -18,6 +18,18 @@ export function setUserEmail(email: string): void {
 export function clearAuth(): void {
   localStorage.removeItem('token');
   localStorage.removeItem('userEmail');
+}
+
+export function getUserRole(): string {
+  if (typeof window === 'undefined') return 'USER';
+  const token = localStorage.getItem('token');
+  if (!token) return 'USER';
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return (payload.role as string) || 'USER';
+  } catch {
+    return 'USER';
+  }
 }
 
 export function getUserEmail(): string {
@@ -152,4 +164,33 @@ export const api = {
 
   setDefaultTemplate: (id: string) =>
     request<EmailTemplate>('PUT', `/templates/${id}/default`, {}),
+
+  listAdminUsers: () =>
+    request<AdminUser[]>('GET', '/admin/users'),
+
+  updateAdminUser: (id: string, data: { role?: 'USER' | 'ADMIN'; monthlyDomainLimit?: number | null }) =>
+    request<{ id: string; email: string; role: string; monthlyDomainLimit: number | null }>(
+      'PATCH',
+      `/admin/users/${id}`,
+      data,
+    ),
+
+  getAuditLog: (params: {
+    page?: number;
+    limit?: number;
+    adminEmail?: string;
+    targetEmail?: string;
+    action?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    order?: 'asc' | 'desc';
+  } = {}) => {
+    const q = new URLSearchParams();
+    (Object.entries(params) as [string, string | number | undefined][]).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') q.set(k, String(v));
+    });
+    const qs = q.toString();
+    return request<PaginatedAuditLog>('GET', `/admin/audit-log${qs ? `?${qs}` : ''}`);
+  },
+
 };

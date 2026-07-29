@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { clearAuth, getUserEmail } from '@/lib/api';
+import { clearAuth, getUserEmail, getUserRole } from '@/lib/api';
 import { useLang } from '@/contexts/LangContext';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -12,9 +12,11 @@ export default function Header() {
   const router = useRouter();
   const isDark = theme === 'dark';
   const [email, setEmail] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     setEmail(getUserEmail());
+    setIsAdmin(getUserRole() === 'ADMIN');
   }, []);
 
   function logout() {
@@ -53,6 +55,16 @@ export default function Header() {
         </button>
 
         <div className={`h-6 w-px ${isDark ? 'bg-outline-variant/20' : 'bg-slate-200'}`} />
+
+        {isAdmin && (
+          <button
+            onClick={() => router.push('/admin')}
+            className={`p-2 rounded-full transition-all duration-300 active:scale-95 ${isDark ? 'text-on-surface-variant hover:bg-surface-container-high hover:text-white' : 'text-slate-500 hover:bg-slate-200 hover:text-slate-900'}`}
+            title={t.adminNav}
+          >
+            <span className="material-symbols-outlined text-[20px]">admin_panel_settings</span>
+          </button>
+        )}
 
         <button
           onClick={() => router.push('/settings')}

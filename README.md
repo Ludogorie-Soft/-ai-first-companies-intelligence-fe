@@ -1,8 +1,27 @@
 # AI Companies Intelligence — Frontend
 
-Next.js frontend for the B2B Data Enrichment platform. Supports Bulgarian (default) and English — toggle in the header.
+Next.js frontend for the AI Companies Intelligence platform. Supports Bulgarian (default) and English with a language toggle in the header.
 
-> The API lives in a separate repo: [`ai-first-companies-intelligence-api`](../ai-first-companies-intelligence-api)
+> The backend API is available in a separate repository:
+> https://github.com/EmilyStoyanova/ai-first-companies-intelligence-api
+
+---
+
+## Live Demo
+
+**Frontend**
+
+https://ai-first-companies-intelligence-fe.onrender.com
+
+**Backend API**
+
+https://ai-first-companies-intelligence-api.onrender.com
+
+**API Documentation (Swagger)**
+
+https://ai-first-companies-intelligence-api.onrender.com/docs
+
+---
 
 ## Stack
 
@@ -11,8 +30,10 @@ Next.js frontend for the B2B Data Enrichment platform. Supports Bulgarian (defau
 | Framework | Next.js 15 (App Router) |
 | Language | TypeScript |
 | Styling | Plain CSS (CSS variables, no UI library) |
-| i18n | Custom context — BG default, EN toggle |
-| State | React hooks (`useState`, `useEffect`, `useRef`) |
+| i18n | Custom context — Bulgarian (default) / English |
+| State | React Hooks (`useState`, `useEffect`, `useRef`) |
+
+---
 
 ## Getting Started
 
@@ -22,70 +43,118 @@ Next.js frontend for the B2B Data Enrichment platform. Supports Bulgarian (defau
 npm install
 ```
 
-### 2. Start the backend first
+### 2. Configure the environment
 
-The frontend proxies all `/api/*` requests to `http://localhost:3001`. Make sure the API is running before starting the frontend.
+Create a `.env.local` file in the project root:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3001
+```
+
+### 3. Start the backend
+
+The frontend communicates with the backend using the `NEXT_PUBLIC_API_URL` environment variable.
+
+Start the backend first:
 
 ```bash
-# In the API repo
+# In the backend repository
 npm run dev
 ```
 
-### 3. Run the frontend
+The backend will run at:
+
+```
+http://localhost:3001
+```
+
+### 4. Run the frontend
 
 ```bash
 npm run dev
 ```
 
-Opens at **http://localhost:3000**
+The frontend will be available at:
+
+```
+http://localhost:3000
+```
+
+---
 
 ## Features
 
-- **Auth** — register (with email confirmation) and login with JWT stored in `localStorage`
-- **Upload** — drag-and-drop or file picker for `.csv` / `.xlsx` files with domain lists
-- **Batch list** — live progress bar that animates from 0% → 100% as the worker processes companies; polls every 3 seconds while jobs are running
-- **Companies modal** — paginated view of enriched company profiles including team members (name, position, email)
-- **Export** — download results as CSV or XLSX when a batch completes
-- **Delete** — remove a batch and its associated data
-- **BG/EN** — full translation of the UI; language persists per session via a toggle button in the header
+- JWT authentication (register, email confirmation and login)
+- Drag-and-drop CSV/XLSX upload
+- Batch processing with live progress updates
+- Paginated company profiles
+- Company team members with contact information
+- CSV/XLSX export
+- Batch deletion
+- Bulgarian / English interface
+- Responsive dashboard
+- Automatic polling while enrichment is running
+
+---
 
 ## Project Structure
 
 ```
 app/
   layout.tsx          # Root layout with LangProvider
-  globals.css         # Design system (CSS variables, all component styles)
-  page.tsx            # Auth page (login / register)
+  globals.css         # Global styles and design system
+  page.tsx            # Login / Register page
+
   dashboard/
-    page.tsx          # Dashboard page
+    page.tsx          # Main dashboard
 
 components/
-  AuthForm.tsx        # Login + register tabs
-  Header.tsx          # Top bar: logo, email, language toggle, logout
-  UploadCard.tsx      # Drag-and-drop file upload
-  BatchTable.tsx      # Table wrapper with empty/loading states
-  BatchRow.tsx        # Single batch row with progress animation
-  CompaniesModal.tsx  # Paginated company list with team contacts
-  Dashboard.tsx       # Main controller: auth guard, polling, toasts
+  AuthForm.tsx
+  Header.tsx
+  UploadCard.tsx
+  BatchTable.tsx
+  BatchRow.tsx
+  CompaniesModal.tsx
+  Dashboard.tsx
 
 contexts/
-  LangContext.tsx     # BG/EN translations and language toggle
+  LangContext.tsx
 
 lib/
-  api.ts              # Typed API client (proxied to localhost:3001)
+  api.ts              # Typed API client using NEXT_PUBLIC_API_URL
   types.ts            # Shared TypeScript types
 ```
 
-## How the Progress Animation Works
+---
 
-The progress bar counts from 0% to the real completion percentage in real time — it does not jump directly to the final value.
+## Progress Animation
 
-Each `BatchRow` uses a `useRef`-stored timer that increments `displayPct` by 1–2% every 80 ms. When the API poll returns a new (higher) percentage, only the `target` is updated — the timer catches up naturally. When a batch completes, the badge and download buttons appear only after the counter finishes (never "Done at 0%").
+The progress bar smoothly animates from **0%** to the actual completion percentage instead of jumping directly.
 
-## Scripts
+Each `BatchRow` keeps its own animation timer using `useRef`. The displayed percentage increases gradually until it reaches the latest value received from the backend polling.
+
+---
+
+## Available Scripts
 
 ```bash
-npm run dev     # Development server on port 3000
-npm run build   # Production build
-npm run start   # Serve production build
+npm run dev       # Start development server
+npm run build     # Create production build
+npm run start     # Start production server
 ```
+
+---
+
+## Production
+
+Frontend:
+
+https://ai-first-companies-intelligence-fe.onrender.com
+
+Backend:
+
+https://ai-first-companies-intelligence-api.onrender.com
+
+Swagger:
+
+https://ai-first-companies-intelligence-api.onrender.com/docs

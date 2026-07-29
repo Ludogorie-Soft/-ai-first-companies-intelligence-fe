@@ -64,7 +64,11 @@ export default function UploadCard({ onUploaded, onNotify }: Props) {
       onUploaded();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      const localized = msg.includes('No valid domains') ? t.uploadNoDomains : msg;
+      const localized = msg.includes('No valid domains')
+        ? t.uploadNoDomains
+        : msg === 'Monthly domain limit exceeded'
+        ? t.monthlyLimitExceeded
+        : msg;
       onNotify(localized, 'error');
     } finally {
       setUploading(false);
