@@ -10,6 +10,7 @@ import Header from './Header';
 import UploadCard from './UploadCard';
 import PersonaSearchCard from './PersonaSearchCard';
 import TemplatesCard from './TemplatesCard';
+import CompanyDataForm from './CompanyDataForm';
 import BatchTable from './BatchTable';
 import CompaniesModal from './CompaniesModal';
 
@@ -36,7 +37,7 @@ export default function Dashboard() {
   const [modalBatchName, setModalBatchName] = useState('');
   const [modalIsPersonaSearch, setModalIsPersonaSearch] = useState(false);
   const [banner, setBanner] = useState<{ msg: string; type: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'upload' | 'persona' | 'templates'>('upload');
+  const [activeTab, setActiveTab] = useState<'upload' | 'persona' | 'templates' | 'company-data'>('upload');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -219,20 +220,36 @@ export default function Dashboard() {
               {t.templatesTab}
             </span>
           </button>
+          <button
+            onClick={() => setActiveTab('company-data')}
+            className={`px-5 py-2.5 rounded-lg text-sm font-bold tracking-wide transition-all duration-200 ${
+              activeTab === 'company-data'
+                ? isDark ? 'bg-surface-container-highest text-white shadow-sm' : 'bg-white text-slate-900 shadow-sm'
+                : isDark ? 'text-on-surface-variant hover:text-white' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px]">domain</span>
+              {t.companyDataNav}
+            </span>
+          </button>
         </div>
 
         {activeTab === 'upload' && <UploadCard onUploaded={handleUploaded} onNotify={notify} />}
         {activeTab === 'persona' && <PersonaSearchCard onSearched={handleUploaded} onNotify={notify} />}
         {activeTab === 'templates' && <TemplatesCard onNotify={notify} />}
+        {activeTab === 'company-data' && <CompanyDataForm embedded />}
 
-        <BatchTable
-          batches={batches}
-          loading={loadingBatches}
-          onDelete={handleDelete}
-          onView={openModal}
-          onNotify={notify}
-          onReEnrich={loadBatches}
-        />
+        {activeTab !== 'company-data' && (
+          <BatchTable
+            batches={batches}
+            loading={loadingBatches}
+            onDelete={handleDelete}
+            onView={openModal}
+            onNotify={notify}
+            onReEnrich={loadBatches}
+          />
+        )}
       </div>
 
       {modalBatchId && (

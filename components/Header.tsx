@@ -26,9 +26,13 @@ export default function Header() {
 
   return (
     <header className={`fixed top-0 right-0 left-0 z-50 backdrop-blur-xl flex justify-between items-center px-6 md:px-12 h-20 ${isDark ? 'bg-background/80' : 'bg-slate-50/80 border-b border-slate-200'}`}>
-      <span className={`text-lg font-headline font-bold tracking-tighter ${isDark ? 'text-white' : 'text-slate-900'}`}>
+      <button
+        type="button"
+        onClick={() => router.push('/dashboard')}
+        className={`text-lg font-headline font-bold tracking-tighter hover:opacity-80 transition-opacity ${isDark ? 'text-white' : 'text-slate-900'}`}
+      >
         Companies Intelligence
-      </span>
+      </button>
 
       <div className="flex items-center gap-4">
         {email && (
@@ -65,6 +69,14 @@ export default function Header() {
             <span className="material-symbols-outlined text-[20px]">admin_panel_settings</span>
           </button>
         )}
+
+        <button
+          onClick={() => router.push('/company-data')}
+          className={`p-2 rounded-full transition-all duration-300 active:scale-95 ${isDark ? 'text-on-surface-variant hover:bg-surface-container-high hover:text-white' : 'text-slate-500 hover:bg-slate-200 hover:text-slate-900'}`}
+          title={t.companyDataNav}
+        >
+          <span className="material-symbols-outlined text-[20px]">domain</span>
+        </button>
 
         <button
           onClick={() => router.push('/settings')}

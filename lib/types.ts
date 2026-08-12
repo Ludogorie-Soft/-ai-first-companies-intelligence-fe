@@ -107,6 +107,9 @@ export interface TenantProfile {
   contactPersonTitle: string | null;
   contactPersonEmail: string | null;
   contactPersonPhone: string | null;
+  aboutUs: string | null;
+  productsServices: string | null;
+  portfolio: string | null;
 }
 
 export interface EmailTemplate {

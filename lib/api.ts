@@ -132,6 +132,7 @@ export const api = {
     keywords?: string;
     maxResults?: number;
     templateId?: string;
+    emailLanguage?: 'bg' | 'en' | 'website';
   }) => request<PersonaSearchResult>('POST', '/persona-searches', params),
 
   getCandidates: (batchId: string) =>

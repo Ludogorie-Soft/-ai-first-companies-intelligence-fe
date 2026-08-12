@@ -22,6 +22,7 @@ export default function PersonaSearchCard({ onSearched, onNotify }: Props) {
   const [location, setLocation] = useState('');
   const [keywords, setKeywords] = useState('');
   const [maxResults, setMaxResults] = useState(20);
+  const [emailLanguage, setEmailLanguage] = useState<'bg' | 'en' | 'website'>('bg');
   const [searching, setSearching] = useState(false);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
@@ -42,12 +43,14 @@ export default function PersonaSearchCard({ onSearched, onNotify }: Props) {
         keywords: keywords.trim() || undefined,
         maxResults,
         templateId: selectedTemplateId || undefined,
+        emailLanguage,
       });
       onNotify(t.searchSuccess, 'success');
       setPersona('');
       setLocation('');
       setKeywords('');
       setMaxResults(20);
+      setEmailLanguage('bg');
       onSearched();
     } catch (err: unknown) {
       onNotify(err instanceof Error ? err.message : String(err), 'error');
@@ -179,7 +182,21 @@ export default function PersonaSearchCard({ onSearched, onNotify }: Props) {
                 </div>
               )}
 
-              {/* Row 4: maxResults + submit */}
+              {/* Row 4: email language */}
+              <div>
+                <label className={labelBase}>{t.emailLanguageLabel}</label>
+                <select
+                  value={emailLanguage}
+                  onChange={(e) => setEmailLanguage(e.target.value as 'bg' | 'en' | 'website')}
+                  className={inputBase}
+                >
+                  <option value="bg">{t.emailLanguageBg}</option>
+                  <option value="en">{t.emailLanguageEn}</option>
+                  <option value="website">{t.emailLanguageWebsite}</option>
+                </select>
+              </div>
+
+              {/* Row 5: maxResults + submit */}
               <div className="flex flex-wrap items-end gap-5 pt-2">
                 <div className="flex-shrink-0">
                   <label className={labelBase}>{t.maxResultsLabel}</label>
