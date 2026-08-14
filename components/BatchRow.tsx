@@ -25,7 +25,10 @@ export default function BatchRow({ batch, onDelete, onView, onNotify, onReEnrich
   const { t } = useLang();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const realPct = Math.round(batch.completionPercentage);
+  // Clamped defensively — the API derives this and can no longer exceed 100, but an
+  // out-of-range value would render the bar wider than its track.
+  const rawPct = Number(batch.completionPercentage);
+  const realPct = Number.isFinite(rawPct) ? Math.min(100, Math.max(0, Math.round(rawPct))) : 0;
   const isDone = batch.status === 'COMPLETED' || batch.status === 'FAILED';
 
   const [displayPct, setDisplayPct] = useState(() => (isDone ? realPct : 0));
