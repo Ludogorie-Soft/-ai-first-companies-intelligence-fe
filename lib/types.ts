@@ -87,7 +87,27 @@ export interface UploadResult {
   invalidRows?: number;
 }
 
-export type CandidateStatus = 'KEPT' | 'FILTERED' | 'BLOCKED' | 'EXCLUDED';
+/** REVIEW is the middle tier: uncertain candidates, never crawled automatically. */
+export type CandidateStatus = 'KEPT' | 'REVIEW' | 'FILTERED' | 'BLOCKED' | 'EXCLUDED';
+
+/** What one criterion argued for, independently of the final verdict. */
+export type DecisionEffect = 'ACCEPT' | 'REVIEW' | 'REJECT';
+
+/** Which part of the pipeline produced a signal. Matches DecisionStage on the API. */
+export type DecisionStage =
+  | 'search' | 'blocklist' | 'llm' | 'classifier'
+  | 'location' | 'qualifier' | 'post_crawl';
+
+/** One criterion that fired, with the evidence behind it. */
+export interface DecisionSignal {
+  /** Stable ReasonCode from the API; translated via `reason_<criterion>`. */
+  criterion: string;
+  effect: DecisionEffect;
+  stage: DecisionStage;
+  /** Human-readable evidence, already in Bulgarian. */
+  detail?: string;
+  weight?: number;
+}
 
 export interface DiscoveryCandidate {
   id: string;
@@ -98,6 +118,13 @@ export interface DiscoveryCandidate {
   snippet?: string;
   status: CandidateStatus;
   createdAt: string;
+  confidence?: number | null;
+  pageType?: string | null;
+  /** ReasonCode for the verdict — populated for accepted candidates too. */
+  rejectedReason?: string | null;
+  /** Every criterion that produced the verdict, in evaluation order. */
+  decisionSignals?: DecisionSignal[] | null;
+  decidedAt?: string | null;
 }
 
 export interface TenantProfile {
