@@ -22,6 +22,10 @@ export default function PersonaSearchCard({ onSearched, onNotify }: Props) {
   const [location, setLocation] = useState('');
   const [keywords, setKeywords] = useState('');
   const [maxResults, setMaxResults] = useState(20);
+  // Repeat searches are served from a 30-day discovery cache, which replays the
+  // stored verdicts verbatim. After a filtering change that is exactly wrong, so
+  // this lets you pay for a fresh search on purpose.
+  const [forceRefresh, setForceRefresh] = useState(false);
   const [emailLanguage, setEmailLanguage] = useState<'bg' | 'en' | 'website'>('bg');
   const [searching, setSearching] = useState(false);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
@@ -44,12 +48,14 @@ export default function PersonaSearchCard({ onSearched, onNotify }: Props) {
         maxResults,
         templateId: selectedTemplateId || undefined,
         emailLanguage,
+        forceRecrawl: forceRefresh,
       });
       onNotify(t.searchSuccess, 'success');
       setPersona('');
       setLocation('');
       setKeywords('');
       setMaxResults(20);
+      setForceRefresh(false);
       setEmailLanguage('bg');
       onSearched();
     } catch (err: unknown) {
@@ -220,6 +226,23 @@ export default function PersonaSearchCard({ onSearched, onNotify }: Props) {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div className="flex-shrink-0">
+                  <label
+                    className={`flex items-center gap-2 cursor-pointer select-none text-xs font-medium ${
+                      isDark ? 'text-on-surface-variant hover:text-white' : 'text-slate-500 hover:text-slate-900'
+                    } transition-colors`}
+                    title={t.forceRefreshHint}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={forceRefresh}
+                      onChange={(e) => setForceRefresh(e.target.checked)}
+                      className="w-4 h-4 rounded accent-primary cursor-pointer"
+                    />
+                    {t.forceRefreshLabel}
+                  </label>
                 </div>
 
                 <button

@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import type { Company, DiscoveryCandidate, PaginatedCompanies, TeamMember } from '@/lib/types';
+import React, { useEffect, useState } from 'react';
+import type {
+  Company, DecisionSignal, DiscoveryCandidate, PaginatedCompanies, TeamMember,
+} from '@/lib/types';
 import { api } from '@/lib/api';
 import { useLang } from '@/contexts/LangContext';
+import type { Translations } from '@/contexts/LangContext';
 import CompanyDetailPanel from './CompanyDetailPanel';
 
 interface Props {
@@ -13,7 +16,28 @@ interface Props {
   onClose: () => void;
 }
 
-type Tab = 'results' | 'candidates';
+// The review tab sits between the two existing ones: results the pipeline is sure
+// about, then the ones it is not, then everything it looked at.
+type Tab = 'results' | 'review' | 'candidates';
+
+/**
+ * Reason codes and stages are stable machine strings from the API, mapped to
+ * translated labels here. An unknown code falls back to the raw string rather
+ * than rendering blank — a new code on the API stays readable until translated.
+ */
+function labelFor(t: Translations, prefix: 'reason' | 'stage', code: string | null | undefined): string {
+  if (!code) return '—';
+  const value = (t as unknown as Record<string, unknown>)[`${prefix}_${code}`];
+  return typeof value === 'string' ? value : code;
+}
+
+function effectIcon(effect: DecisionSignal['effect']): { icon: string; className: string } {
+  switch (effect) {
+    case 'ACCEPT': return { icon: 'check_circle', className: 'text-primary' };
+    case 'REVIEW': return { icon: 'help',         className: 'text-amber-400' };
+    default:       return { icon: 'cancel',       className: 'text-error' };
+  }
+}
 
 export default function CompaniesModal({ batchId, batchName, isPersonaSearch, onClose }: Props) {
   const { t } = useLang();
@@ -29,6 +53,8 @@ export default function CompaniesModal({ batchId, batchName, isPersonaSearch, on
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [errorCandidates, setErrorCandidates] = useState('');
   const [updatingDomain, setUpdatingDomain] = useState<string | null>(null);
+  /** Domains whose decision criteria are expanded. */
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const [activeTab, setActiveTab] = useState<Tab>('results');
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -43,7 +69,7 @@ export default function CompaniesModal({ batchId, batchName, isPersonaSearch, on
   }, [batchId]);
 
   useEffect(() => {
-    if (activeTab === 'candidates' && batchId && candidates === null) {
+    if ((activeTab === 'candidates' || activeTab === 'review') && batchId && candidates === null) {
       fetchCandidates(batchId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -76,12 +102,12 @@ export default function CompaniesModal({ batchId, batchName, isPersonaSearch, on
     }
   }
 
-  async function handleCandidateAction(domain: string, action: 'exclude' | 'include') {
+  async function handleCandidateAction(domain: string, action: 'exclude' | 'include' | 'reject') {
     if (!batchId) return;
     setUpdatingDomain(domain);
     try {
       await api.updateCandidate(batchId, domain, action);
-      // Refresh both tabs
+      // Refresh all tabs — an action in one changes what the others show.
       await Promise.all([
         fetchCandidates(batchId),
         fetchPage(batchId, page),
@@ -91,6 +117,15 @@ export default function CompaniesModal({ batchId, batchName, isPersonaSearch, on
     } finally {
       setUpdatingDomain(null);
     }
+  }
+
+  function toggleExpanded(domain: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(domain)) next.delete(domain);
+      else next.add(domain);
+      return next;
+    });
   }
 
   function crawlStatusBadge(s: string) {
@@ -112,6 +147,7 @@ export default function CompaniesModal({ batchId, batchName, isPersonaSearch, on
   function candidateStatusStyle(s: DiscoveryCandidate['status']): string {
     const map: Record<DiscoveryCandidate['status'], string> = {
       KEPT:     'bg-primary/10 text-primary',
+      REVIEW:   'bg-amber-400/10 text-amber-400',
       FILTERED: 'bg-secondary/10 text-secondary',
       BLOCKED:  'bg-surface-container-highest text-on-surface-variant',
       EXCLUDED: 'bg-error/10 text-error',
@@ -122,6 +158,7 @@ export default function CompaniesModal({ batchId, batchName, isPersonaSearch, on
   function candidateStatusLabel(s: DiscoveryCandidate['status']): string {
     const map: Record<DiscoveryCandidate['status'], string> = {
       KEPT:     t.candidateKept,
+      REVIEW:   t.candidateReview,
       FILTERED: t.candidateFiltered,
       BLOCKED:  t.candidateBlocked,
       EXCLUDED: t.candidateExcluded,
@@ -269,7 +306,7 @@ export default function CompaniesModal({ batchId, batchName, isPersonaSearch, on
       <div className="overflow-x-auto">
         {/* Summary pills */}
         <div className="flex gap-2 px-6 py-3 border-b border-outline-variant/10 flex-wrap">
-          {(['KEPT', 'FILTERED', 'BLOCKED', 'EXCLUDED'] as const).map((s) =>
+          {(['KEPT', 'REVIEW', 'FILTERED', 'BLOCKED', 'EXCLUDED'] as const).map((s) =>
             counts[s] ? (
               <span key={s} className={`text-xs px-2.5 py-1 rounded-full font-medium ${candidateStatusStyle(s)}`}>
                 {candidateStatusLabel(s)} · {counts[s]}
@@ -277,61 +314,195 @@ export default function CompaniesModal({ batchId, batchName, isPersonaSearch, on
             ) : null,
           )}
         </div>
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-surface-container-highest/30 border-b border-outline-variant/10">
-              <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-on-surface-variant">{t.domain}</th>
-              <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-on-surface-variant">{t.candidateTitle}</th>
-              <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-on-surface-variant">{t.status}</th>
-              <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-on-surface-variant">{t.actions}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-outline-variant/5">
-            {candidates.map((c) => (
-              <tr key={c.id} className="hover:bg-surface-container-high/50 transition-colors">
-                <td className="px-6 py-4">
-                  <a
-                    href={c.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:text-secondary font-medium text-sm transition-colors"
-                  >
-                    {c.domain}
-                  </a>
-                </td>
-                <td className="px-6 py-4 text-xs text-on-surface-variant max-w-xs truncate">
-                  {c.title || '—'}
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${candidateStatusStyle(c.status)}`}>
-                    {candidateStatusLabel(c.status)}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  {c.status === 'KEPT' && (
-                    <button
-                      onClick={() => handleCandidateAction(c.domain, 'exclude')}
-                      disabled={updatingDomain === c.domain}
-                      className="text-xs px-2 py-1 rounded border border-error/30 text-error hover:bg-error/10 transition-all disabled:opacity-40"
-                    >
-                      {updatingDomain === c.domain ? '…' : t.excludeBtn}
-                    </button>
-                  )}
-                  {(c.status === 'FILTERED' || c.status === 'BLOCKED' || c.status === 'EXCLUDED') && (
-                    <button
-                      onClick={() => handleCandidateAction(c.domain, 'include')}
-                      disabled={updatingDomain === c.domain}
-                      className="text-xs px-2 py-1 rounded border border-primary/30 text-primary hover:bg-primary/10 transition-all disabled:opacity-40"
-                    >
-                      {updatingDomain === c.domain ? '…' : t.includeBtn}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {renderCandidateTable(candidates)}
       </div>
+    );
+  }
+
+  /** The review tab: only the candidates the pipeline was not confident about. */
+  function renderReview() {
+    if (loadingCandidates) {
+      return (
+        <div className="flex items-center justify-center py-20 gap-3 text-on-surface-variant text-sm">
+          <span className="spinner" />
+          <span>{t.loading}</span>
+        </div>
+      );
+    }
+    if (errorCandidates) {
+      return (
+        <div className="m-8 px-4 py-3 bg-error-container/30 border border-error/20 rounded text-error text-sm">
+          {errorCandidates}
+        </div>
+      );
+    }
+
+    const forReview = (candidates ?? []).filter((c) => c.status === 'REVIEW');
+
+    // An empty review list is the good outcome, not a missing-data state.
+    if (forReview.length === 0) {
+      return (
+        <div className="flex flex-col items-center gap-4 py-20 text-on-surface-variant">
+          <span className="material-symbols-outlined text-5xl opacity-30 text-primary">task_alt</span>
+          <p className="text-sm text-center max-w-sm">{t.noReviewNeeded}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="overflow-x-auto">
+        <p className="px-6 py-3 text-xs text-on-surface-variant border-b border-outline-variant/10">
+          {t.reviewIntro}
+        </p>
+        {renderCandidateTable(forReview)}
+      </div>
+    );
+  }
+
+  /** Shared by both tabs: domain, title, reason, status, actions — plus expandable criteria. */
+  function renderCandidateTable(rows: DiscoveryCandidate[]) {
+    return (
+      <table className="w-full text-left border-collapse">
+        <thead>
+          <tr className="bg-surface-container-highest/30 border-b border-outline-variant/10">
+            <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-on-surface-variant">{t.domain}</th>
+            <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-on-surface-variant">{t.candidateTitle}</th>
+            <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-on-surface-variant">{t.reasonColumn}</th>
+            <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-on-surface-variant">{t.status}</th>
+            <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-on-surface-variant">{t.actions}</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-outline-variant/5">
+          {rows.map((c) => {
+            const signals   = c.decisionSignals ?? [];
+            const isOpen    = expanded.has(c.domain);
+            const isBusy    = updatingDomain === c.domain;
+            // The headline evidence is the signal that matches the stored verdict.
+            const primary   = signals.find((s) => s.criterion === c.rejectedReason) ?? signals[0];
+
+            return (
+              <React.Fragment key={c.id}>
+                <tr className="hover:bg-surface-container-high/50 transition-colors">
+                  <td className="px-6 py-4">
+                    <a
+                      href={c.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:text-secondary font-medium text-sm transition-colors"
+                    >
+                      {c.domain}
+                    </a>
+                  </td>
+                  <td className="px-6 py-4 text-xs text-on-surface-variant max-w-xs truncate">
+                    {c.title || '—'}
+                  </td>
+                  <td className="px-6 py-4 max-w-xs">
+                    <button
+                      onClick={() => toggleExpanded(c.domain)}
+                      className="flex items-start gap-1 text-left group"
+                      aria-expanded={isOpen}
+                    >
+                      <span
+                        className={`material-symbols-outlined text-[16px] mt-0.5 text-on-surface-variant transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                      >
+                        chevron_right
+                      </span>
+                      <span>
+                        <span className="block text-xs text-on-surface group-hover:text-primary transition-colors">
+                          {labelFor(t, 'reason', c.rejectedReason)}
+                        </span>
+                        {primary?.detail && (
+                          <span className="block text-[11px] text-on-surface-variant line-clamp-2">
+                            {primary.detail}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${candidateStatusStyle(c.status)}`}>
+                      {candidateStatusLabel(c.status)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex gap-2">
+                      {c.status === 'KEPT' && (
+                        <button
+                          onClick={() => handleCandidateAction(c.domain, 'exclude')}
+                          disabled={isBusy}
+                          className="text-xs px-2 py-1 rounded border border-error/30 text-error hover:bg-error/10 transition-all disabled:opacity-40"
+                        >
+                          {isBusy ? '…' : t.excludeBtn}
+                        </button>
+                      )}
+                      {c.status !== 'KEPT' && (
+                        <button
+                          onClick={() => handleCandidateAction(c.domain, 'include')}
+                          disabled={isBusy}
+                          className="text-xs px-2 py-1 rounded border border-primary/30 text-primary hover:bg-primary/10 transition-all disabled:opacity-40"
+                        >
+                          {isBusy ? '…' : t.includeBtn}
+                        </button>
+                      )}
+                      {c.status === 'REVIEW' && (
+                        <button
+                          onClick={() => handleCandidateAction(c.domain, 'reject')}
+                          disabled={isBusy}
+                          className="text-xs px-2 py-1 rounded border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-highest transition-all disabled:opacity-40"
+                        >
+                          {isBusy ? '…' : t.rejectBtn}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+
+                {isOpen && (
+                  <tr className="bg-surface-container-high/30">
+                    <td colSpan={5} className="px-6 py-4">
+                      <div className="flex items-baseline justify-between mb-2">
+                        <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                          {t.criteriaHeading}
+                        </span>
+                        {typeof c.confidence === 'number' && (
+                          <span className="text-xs text-on-surface-variant">
+                            {t.confidenceLabel}: {c.confidence}
+                          </span>
+                        )}
+                      </div>
+                      {signals.length === 0 ? (
+                        <p className="text-xs text-on-surface-variant">{t.noCriteria}</p>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {signals.map((s, i) => {
+                            const { icon, className } = effectIcon(s.effect);
+                            return (
+                              <li key={i} className="flex items-start gap-2 text-xs">
+                                <span className={`material-symbols-outlined text-[16px] ${className}`}>
+                                  {icon}
+                                </span>
+                                <span className="text-on-surface-variant w-32 flex-shrink-0">
+                                  {labelFor(t, 'stage', s.stage)}
+                                </span>
+                                <span className="text-on-surface flex-shrink-0 w-56">
+                                  {labelFor(t, 'reason', s.criterion)}
+                                </span>
+                                {s.detail && (
+                                  <span className="text-on-surface-variant">{s.detail}</span>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
     );
   }
 
@@ -368,19 +539,36 @@ export default function CompaniesModal({ batchId, batchName, isPersonaSearch, on
         {/* Tabs — only shown for persona search batches */}
         {isPersonaSearch && (
           <div className="flex border-b border-outline-variant/10 px-8 flex-shrink-0">
-            {(['results', 'candidates'] as Tab[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${
-                  activeTab === tab
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-on-surface-variant hover:text-white'
-                }`}
-              >
-                {tab === 'results' ? t.resultsTab : t.candidatesTab}
-              </button>
-            ))}
+            {(['results', 'review', 'candidates'] as Tab[]).map((tab) => {
+              const label =
+                tab === 'results' ? t.resultsTab
+              : tab === 'review'  ? t.reviewTab
+              :                     t.candidatesTab;
+              // Only the review tab carries a count — it is the one that asks the
+              // user to do something, so the number is the call to action.
+              const pending = tab === 'review'
+                ? (candidates ?? []).filter((c) => c.status === 'REVIEW').length
+                : 0;
+
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                    activeTab === tab
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-on-surface-variant hover:text-white'
+                  }`}
+                >
+                  {label}
+                  {pending > 0 && (
+                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-amber-400/10 text-amber-400 font-medium">
+                      {pending}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -434,6 +622,7 @@ export default function CompaniesModal({ batchId, batchName, isPersonaSearch, on
             </>
           )}
 
+          {activeTab === 'review' && renderReview()}
           {activeTab === 'candidates' && renderCandidates()}
         </div>
 

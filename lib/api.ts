@@ -126,19 +126,29 @@ export const api = {
   reEnrichBatch: (id: string) =>
     request<{ batchId: string; reEnqueuedCompanies: number; status: string }>('POST', `/batches/${id}/re-enrich`),
 
-  createPersonaSearch: (params: {
+  createPersonaSearch: ({
+    forceRecrawl,
+    ...params
+  }: {
     persona: string;
     location: string;
     keywords?: string;
     maxResults?: number;
     templateId?: string;
     emailLanguage?: 'bg' | 'en' | 'website';
-  }) => request<PersonaSearchResult>('POST', '/persona-searches', params),
+    /** Skips the 30-day discovery cache so the search is genuinely re-run. */
+    forceRecrawl?: boolean;
+  }) =>
+    request<PersonaSearchResult>('POST', '/persona-searches', {
+      ...params,
+      // The API reads this as snake_case (routes/persona.ts).
+      force_recrawl: forceRecrawl,
+    }),
 
   getCandidates: (batchId: string) =>
     request<DiscoveryCandidate[]>('GET', `/batches/${batchId}/candidates`),
 
-  updateCandidate: (batchId: string, domain: string, action: 'exclude' | 'include') =>
+  updateCandidate: (batchId: string, domain: string, action: 'exclude' | 'include' | 'reject') =>
     request<{ ok: boolean; crawlTriggered?: boolean }>(
       'PATCH',
       `/batches/${batchId}/candidates/${encodeURIComponent(domain)}`,
